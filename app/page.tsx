@@ -1,101 +1,136 @@
 import Image from "next/image";
+import { prisma } from "./lib/prisma";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Users } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Challenge, ChallengeStatus } from "@prisma/client";
 
-export default function Home() {
+type ChallengeWithUsers = Challenge & {
+  challenger: { name: string | null; email: string };
+  challenged: { name: string | null; email: string };
+};
+
+async function getData(): Promise<ChallengeWithUsers[]> {
+  try {
+    const challenges = await prisma.challenge.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      include: {
+        challenger: {
+          select: {
+            name: true,
+            email: true,
+          }
+        },
+        challenged: {
+          select: {
+            name: true,
+            email: true,
+          }
+        }
+      },
+      take: 6, // Limit to 6 latest challenges
+    });
+    
+    return challenges as ChallengeWithUsers[];
+  } catch (error) {
+    console.error('Error fetching challenges:', error);
+    return [];
+  }
+}
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "pending" | "accepted" | "declined" | "archived";
+
+function getStatusColor(status: ChallengeStatus): BadgeVariant {
+  switch (status) {
+    case "PENDING":
+      return "pending";
+    case "ACCEPTED":
+      return "accepted";
+    case "DECLINED":
+      return "declined";
+    case "ARCHIVED":
+      return "archived";
+    default:
+      return "default";
+  }
+}
+
+export default async function Home() {
+  const data = await getData();
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <main className="container mx-auto py-10">
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-4">
+          <h1 className="text-4xl font-bold">Latest Challenges</h1>
+          <p className="text-muted-foreground">
+            Check out what people are challenging each other to do for charity
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {data.map((challenge, i) => (
+            <Card key={i} className="overflow-hidden transition-all hover:shadow-lg">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <Badge variant={getStatusColor(challenge.status as ChallengeStatus)} className="mb-2">
+                    {challenge.status}
+                  </Badge>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <CalendarIcon className="mr-1 h-4 w-4" />
+                    {format(new Date(challenge.deadline), "MMM d, yyyy")}
+                  </div>
+                </div>
+                <CardTitle className="line-clamp-2">{challenge.description}</CardTitle>
+                {challenge.charity && (
+                  <CardDescription className="flex items-center gap-2">
+                    <span className="text-primary">Charity:</span> {challenge.charity}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex -space-x-2">
+                      <Avatar className="border-2 border-background">
+                        <AvatarFallback>
+                          {challenge.challenger.name?.[0] || "C"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Avatar className="border-2 border-background">
+                        <AvatarFallback>
+                          {challenge.challenged.name?.[0] || "R"}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <div className="text-sm">
+                      <p className="text-muted-foreground">
+                        {challenge.challenger.name} challenged {challenge.challenged.name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {data.length === 0 && (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Users className="h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">No challenges yet</h3>
+              <p className="text-muted-foreground">
+                Be the first to create a challenge and make a difference!
+              </p>
+            </div>
+          </Card>
+        )}
+      </div>
+    </main>
   );
 }
